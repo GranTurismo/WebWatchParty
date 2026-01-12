@@ -1,0 +1,247 @@
+@page
+@model WebWatchParty.Pages.RoomModel
+@{
+    ViewData["Title"] = "Room: " + Model.RoomId;
+}
+
+<style>
+    #chatMessages {
+        height: 70vh;
+        overflow-y: auto;
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+    }
+    .message { margin-bottom: 10px; }
+    .message-user { font-weight: bold; color: #0d6efd; }
+    .message-system { font-style: italic; color: #6c757d; }
+    #videoContainer {
+        position: relative;
+        padding-bottom: 56.25%; /* 16:9 */
+        height: 0;
+        overflow: hidden;
+    }
+    #videoContainer iframe, #player {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+</style>
+
+<div class="container-fluid mt-3">
+    <div class="row">
+        <!-- Main Content: Video/IFrame -->
+        <div class="col-md-9">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Room: <strong>@Model.RoomId</strong> <small id="adminOnlyLabel" class="text-danger"></small></span>
+                    <div class="d-flex" style="width: 60%;">
+                        <input type="text" id="videoUrl" class="form-control form-control-sm me-2" placeholder="Paste YouTube link (e.g. https://www.youtube.com/watch?v=...)">
+                        <button id="changeUrlBtn" class="btn btn-sm btn-primary">Load Video</button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="videoContainer">
+                         <div id="player"></div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button id="btnPlay" class="btn btn-success btn-sm">Play</button>
+                    <button id="btnPause" class="btn btn-warning btn-sm">Pause</button>
+                    <span id="syncStatus" class="ms-3 text-muted small">Ready</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar: Chat -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header bg-primary text-white">Chat</div>
+                <div id="chatMessages" class="card-body"></div>
+                <div class="card-footer">
+                    <div class="input-group">
+                        <input type="text" id="chatInput" class="form-control" placeholder="Type a message...">
+                        <button id="sendBtn" class="btn btn-primary">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        const roomId = "@Model.RoomId";
+        const userName = "@Model.UserName";
+        var player; // YouTube player
+        var lastUrl = "";
+        var ignoreNextSync = false;
+        var isAdmin = false;
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/watchHub")
+            .withAutomaticReconnect()
+            .build();
+
+        var initialAction = "";
+        var initialTime = 0;
+
+        // SignalR Handlers
+        connection.on("InitRoom", (room, adminStatus) => {
+            isAdmin = adminStatus;
+            console.log("Initializing room state:", room, "IsAdmin:", isAdmin);
+            
+            if (!isAdmin) {
+                document.getElementById("changeUrlBtn").style.display = "none";
+                document.getElementById("videoUrl").style.display = "none";
+                document.getElementById("btnPlay").style.display = "none";
+                document.getElementById("btnPause").style.display = "none";
+                document.getElementById("adminOnlyLabel").innerText = "(View Only)";
+            }
+
+            if (room.messages) {
+                room.messages.forEach(m => appendMessage(m.user, m.message));
+            }
+            if (room.currentVideoUrl) {
+                initialAction = room.action;
+                initialTime = room.currentTime;
+                loadVideo(room.currentVideoUrl);
+            }
+        });
+
+        connection.on("UserJoined", (user) => {
+            appendMessage("system", `${user} joined the room.`);
+        });
+
+        connection.on("ReceiveMessage", (user, message) => {
+            appendMessage(user, message);
+        });
+
+        connection.on("VideoChanged", (url) => {
+            loadVideo(url);
+        });
+
+        connection.on("VideoSynced", (action, time) => {
+            if (player && player.getPlayerState) {
+                ignoreNextSync = true;
+                if (action === "play") {
+                    player.seekTo(time);
+                    player.playVideo();
+                } else if (action === "pause") {
+                    player.pauseVideo();
+                }
+            }
+            document.getElementById("syncStatus").innerText = `Last sync: ${action} at ${Math.round(time)}s`;
+        });
+
+        async function start() {
+            try {
+                await connection.start();
+                await connection.invoke("JoinRoom", roomId, userName);
+                appendMessage("system", "Connected to watch party.");
+            } catch (err) {
+                console.error(err);
+                setTimeout(start, 5000);
+            }
+        }
+
+        // YouTube API Init
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                height: '100%',
+                width: '100%',
+                videoId: '', 
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            if (initialAction === "play") {
+                player.seekTo(initialTime);
+                player.playVideo();
+            } else if (initialAction === "pause") {
+                player.seekTo(initialTime);
+                player.pauseVideo();
+            }
+            initialAction = "";
+        }
+
+        function onPlayerStateChange(event) {
+            if (!isAdmin || ignoreNextSync) {
+                ignoreNextSync = false;
+                return;
+            }
+            // 1 = playing, 2 = paused
+            if (event.data == YT.PlayerState.PLAYING) {
+                connection.invoke("SyncVideo", roomId, "play", player.getCurrentTime());
+            } else if (event.data == YT.PlayerState.PAUSED) {
+                connection.invoke("SyncVideo", roomId, "pause", player.getCurrentTime());
+            }
+        }
+
+        function loadVideo(url) {
+            const ytId = extractYouTubeId(url);
+            if (ytId && player && player.loadVideoById) {
+                player.loadVideoById(ytId);
+            }
+            lastUrl = url;
+        }
+
+        function extractYouTubeId(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length == 11) ? match[2] : null;
+        }
+
+        // UI Listeners
+        document.getElementById("changeUrlBtn").addEventListener("click", () => {
+            const url = document.getElementById("videoUrl").value.trim();
+            if (url) connection.invoke("ChangeVideo", roomId, url);
+        });
+
+        document.getElementById("btnPlay").addEventListener("click", () => {
+            if (player) player.playVideo();
+        });
+
+        document.getElementById("btnPause").addEventListener("click", () => {
+            if (player) player.pauseVideo();
+        });
+
+        document.getElementById("sendBtn").addEventListener("click", sendMessage);
+        document.getElementById("chatInput").addEventListener("keypress", (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        function sendMessage() {
+            const input = document.getElementById("chatInput");
+            const msg = input.value.trim();
+            if (msg) {
+                connection.invoke("SendMessage", roomId, userName, msg);
+                input.value = "";
+            }
+        }
+
+        function appendMessage(user, message) {
+            const container = document.getElementById("chatMessages");
+            const div = document.createElement("div");
+            div.className = "message";
+            if (user === "system") {
+                div.innerHTML = `<span class="message-system">${message}</span>`;
+            } else {
+                div.innerHTML = `<span class="message-user">${user}:</span> <span>${message}</span>`;
+            }
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        start();
+    </script>
+}
