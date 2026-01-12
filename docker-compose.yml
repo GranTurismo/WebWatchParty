@@ -1,9 +1,7 @@
 services:
   webwatchparty:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      container_name: watch
+    image: granturismo565/watch:latest
+    container_name: watch
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - VIRTUAL_HOST=watch.gtgroup.dev
@@ -13,4 +11,3 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_HTTP_PORTS=8080
     restart: always
-
