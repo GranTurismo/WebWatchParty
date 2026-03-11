@@ -9,38 +9,30 @@
     <link rel="stylesheet" href="~/WebWatchParty.styles.css" asp-append-version="true" />
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container">
-                <a class="navbar-brand" asp-area="" asp-page="/Index">WebWatchParty</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
-                        </li>
-                    </ul>
-                </div>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="container-xxl app-header-inner">
+                <a class="app-brand" asp-area="" asp-page="/Index">
+                    <span class="app-brand-mark">▶</span>
+                    <span>WebWatchParty</span>
+                </a>
+
+                <nav class="app-nav">
+                    <a class="app-nav-link" asp-area="" asp-page="/Index">Home</a>
+                    <span class="app-nav-text">Watch together · voice together</span>
+                </nav>
             </div>
-        </nav>
-    </header>
-    <div class="container-fluid">
-        <main role="main" class="pb-3">
+        </header>
+
+        <main role="main" class="app-main container-xxl pb-4">
             @RenderBody()
         </main>
-    </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - WebWatchParty - <a asp-area="" asp-page="/Privacy">Privacy</a>
-        </div>
-    </footer>
+        <footer class="app-footer container-xxl">
+            <span>&copy; 2026 WebWatchParty</span>
+            <span>Shared playback, in-room chat, and browser voice chat.</span>
+        </footer>
+    </div>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>

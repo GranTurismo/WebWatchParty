@@ -4,66 +4,110 @@
     ViewData["Title"] = "Join Watch Party";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Join Watch Party</h1>
+<section class="landing-hero mb-4">
+    <div>
+        <p class="eyebrow mb-2">Movie night, now with voice</p>
+        <h1 class="display-4 fw-bold mb-3">Create a watch room, sync YouTube, chat, and talk live.</h1>
+        <p class="landing-copy mb-0">Spin up a room in seconds, invite friends, and let the first person in manage playback and moderation.</p>
+    </div>
 
-    @if (!string.IsNullOrEmpty(Model.Error))
-    {
-        <div class="alert alert-danger mt-3">
-            @Model.Error
+    <div class="landing-metrics">
+        <div class="metric-card">
+            <span class="metric-value">@Model.Rooms.Count</span>
+            <span class="metric-label">active rooms</span>
         </div>
-    }
+        <div class="metric-card">
+            <span class="metric-value">Voice</span>
+            <span class="metric-label">browser-based audio chat</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-value">Admin</span>
+            <span class="metric-label">kick and playback controls</span>
+        </div>
+    </div>
+</section>
 
-    <div class="row justify-content-center mt-5">
-        <div class="col-md-5">
-            <div class="card mb-4">
-                <div class="card-header">Join or Create Room</div>
-                <div class="card-body">
-                    <form method="get" action="/Room">
-                        <div class="mb-3 text-start">
-                            <label for="userName" class="form-label">Your Name</label>
-                            <input type="text" class="form-control" id="userName" name="userName" required>
-                        </div>
-                        <div class="mb-3 text-start">
-                            <label for="roomId" class="form-label">Room ID</label>
-                            <input type="text" class="form-control" id="roomId" name="roomId" required placeholder="e.g. movie-night">
-                        </div>
-                        <div class="mb-3 text-start">
-                            <label for="password" class="form-label">Password (Optional)</label>
-                            <input type="password" class="form-control" id="password" name="password" placeholder="Leave empty for public room">
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Go to Room</button>
-                    </form>
+@if (!string.IsNullOrEmpty(Model.Error))
+{
+    <div class="alert alert-danger mb-4">
+        @Model.Error
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-12 col-lg-5">
+        <section class="wwp-card h-100">
+            <div class="section-header mb-3">
+                <div>
+                    <p class="section-kicker mb-1">Get started</p>
+                    <h2 class="section-title mb-0">Join or create a room</h2>
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header">Active Rooms</div>
-                <div class="list-group list-group-flush">
-                    @if (!Model.Rooms.Any())
-                    {
-                        <div class="list-group-item text-muted">No active rooms found.</div>
-                    }
-                    @foreach (var room in Model.Rooms)
-                    {
-                        <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>@room.Id</strong>
-                                @if (!room.State.IsPublic)
+            <form method="get" action="/Room" class="d-grid gap-3">
+                <div>
+                    <label for="userName" class="form-label">Your name</label>
+                    <input type="text" class="form-control" id="userName" name="userName" required maxlength="30" placeholder="e.g. Nika">
+                </div>
+
+                <div>
+                    <label for="roomId" class="form-label">Room ID</label>
+                    <input type="text" class="form-control" id="roomId" name="roomId" required maxlength="40" placeholder="e.g. movie-night">
+                </div>
+
+                <div>
+                    <label for="password" class="form-label">Password <span class="text-body-secondary">(optional)</span></label>
+                    <input type="password" class="form-control" id="password" name="password" maxlength="40" placeholder="Leave empty for a public room">
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg">Enter room</button>
+            </form>
+        </section>
+    </div>
+
+    <div class="col-12 col-lg-7">
+        <section class="wwp-card h-100">
+            <div class="section-header mb-3">
+                <div>
+                    <p class="section-kicker mb-1">Live activity</p>
+                    <h2 class="section-title mb-0">Active rooms</h2>
+                </div>
+            </div>
+
+            <div class="room-directory">
+                @if (!Model.Rooms.Any())
+                {
+                    <div class="room-directory-empty">No active rooms yet. Start one and invite your people.</div>
+                }
+
+                @foreach (var room in Model.Rooms)
+                {
+                    <article class="room-directory-item">
+                        <div>
+                            <div class="room-directory-title">@room.Id</div>
+                            <div class="room-directory-meta">
+                                <span class="participant-badge @(room.State.IsPublic ? "participant-badge-voice" : "participant-badge-muted")">
+                                    @(room.State.IsPublic ? "Public" : "Private")
+                                </span>
+                                <span class="participant-badge">@room.State.Participants.Count participant@(room.State.Participants.Count == 1 ? string.Empty : "s")</span>
+                                @if (!string.IsNullOrWhiteSpace(room.State.CurrentVideoUrl))
                                 {
-                                    <span class="badge bg-secondary ms-2">Private</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-success ms-2">Public</span>
+                                    <span class="participant-badge participant-badge-admin">Video loaded</span>
                                 }
                             </div>
-                            <button class="btn btn-sm btn-outline-primary" onclick="joinExisting('@room.Id', @(room.State.IsPublic.ToString().ToLower()))">Join</button>
                         </div>
-                    }
-                </div>
+
+                        <button class="btn btn-outline-light"
+                                type="button"
+                                data-room-id="@room.Id"
+                                data-room-public="@(room.State.IsPublic.ToString().ToLower())"
+                                onclick="joinExisting(this.dataset.roomId, this.dataset.roomPublic === 'true')">
+                            Join
+                        </button>
+                    </article>
+                }
             </div>
-        </div>
+        </section>
     </div>
 </div>
 
